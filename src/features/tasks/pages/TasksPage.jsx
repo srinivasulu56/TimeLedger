@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useOutletContext } from "react-router-dom";
+import TaskCard from "../components/TaskCard";
 
 function TasksPage() {
-  const { tasks, setTasks, setSessions } = useOutletContext();
+  const { tasks, setTasks, sessions, setSessions } = useOutletContext();
 
   const [title, setTitle] = useState("");
   const [draftTitle, setDraftTitle] = useState("");
@@ -96,6 +97,7 @@ function TasksPage() {
     };
 
     setTasks((currentTasks) => [...currentTasks, newTask]);
+
     setSessions((currentSessions) => [
       ...currentSessions,
       ...plannedSessions,
@@ -128,6 +130,28 @@ function TasksPage() {
           Continue
         </button>
       </form>
+
+      <div className="mt-8 grid gap-4 sm:grid-cols-2">
+        {tasks.length === 0 ? (
+          <p className="text-gray-500">
+            No tasks yet. Create your first time plan above.
+          </p>
+        ) : (
+          tasks.map((task) => {
+            const sessionCount = sessions.filter(
+              (session) => session.taskId === task.id
+            ).length;
+
+            return (
+              <TaskCard
+                key={task.id}
+                task={task}
+                sessionCount={sessionCount}
+              />
+            );
+          })
+        )}
+      </div>
 
       {isPlannerOpen && (
         <div
@@ -230,7 +254,7 @@ function TasksPage() {
                       className="rounded-lg border border-gray-200 p-4"
                     >
                       <p className="font-medium">
-                        Session {session.order} · {session.plannedDuration} min
+                        Session {session.order} - {session.plannedDuration} min
                       </p>
 
                       <input

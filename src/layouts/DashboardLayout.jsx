@@ -6,6 +6,7 @@ import Sidebar from "../shared/components/Sidebar";
 function DashboardLayout() {
   const [tasks, setTasks] = useState([]);
   const [sessions, setSessions] = useState([]);
+
   return (
     <div className="min-h-screen">
       <Navbar />
