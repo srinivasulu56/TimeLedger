@@ -4,6 +4,7 @@ import RegisterPage from "../features/auth/pages/RegisterPage";
 import Dashboard from "../features/dashboard/pages/DashboardPage";
 import DashboardLayout from "../layouts/DashboardLayout";
 import TasksPage from "../features/tasks/pages/TasksPage";
+import TaskDetailsPage from "../features/tasks/pages/TaskDetailsPage";
 
 function AppRouter(){
 
@@ -14,6 +15,7 @@ function AppRouter(){
         <Route path="/Dashboard" element={<DashboardLayout/>}>
         <Route index element={<Dashboard/>}/>
         <Route path="tasks" element={<TasksPage/>}/>
+        <Route path="tasks/:taskId" element={<TaskDetailsPage />} />
 
         </Route>
     </Routes>

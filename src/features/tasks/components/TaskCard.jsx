@@ -1,3 +1,5 @@
+import { Link } from "react-router-dom";
+
 function TaskCard({ task, sessionCount }) {
   return (
     <article className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
@@ -16,9 +18,18 @@ function TaskCard({ task, sessionCount }) {
         </span>
       </div>
 
-      <p className="mt-4 text-sm text-gray-600">
-        {sessionCount} planned sessions
-      </p>
+      <div className="mt-4 flex items-center justify-between">
+        <p className="text-sm text-gray-600">
+          {sessionCount} planned sessions
+        </p>
+
+        <Link
+          to={`/dashboard/tasks/${task.id}`}
+          className="text-sm font-medium text-blue-600 hover:text-blue-800"
+        >
+          View details
+        </Link>
+      </div>
     </article>
   );
 }
