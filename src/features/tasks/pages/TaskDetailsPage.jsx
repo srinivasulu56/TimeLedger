@@ -1,10 +1,35 @@
-import { Link, useOutletContext, useParams } from "react-router-dom";
+import {
+  Link,
+  useNavigate,
+  useOutletContext,
+  useParams,
+} from "react-router-dom";
 
 function TaskDetailsPage() {
   const { taskId } = useParams();
-  const { tasks, sessions } = useOutletContext();
+  const navigate = useNavigate();
+
+  const { tasks, setTasks, sessions, setSessions } = useOutletContext();
 
   const task = tasks.find((currentTask) => currentTask.id === taskId);
+
+  function handleDeleteTask() {
+    const shouldDelete = window.confirm(
+      `Delete "${task.title}" and all of its sessions?`
+    );
+
+    if (!shouldDelete) return;
+
+    setTasks((currentTasks) =>
+      currentTasks.filter((currentTask) => currentTask.id !== task.id)
+    );
+
+    setSessions((currentSessions) =>
+      currentSessions.filter((session) => session.taskId !== task.id)
+    );
+
+    navigate("/dashboard/tasks");
+  }
 
   if (!task) {
     return (
@@ -49,9 +74,19 @@ function TaskDetailsPage() {
             </p>
           </div>
 
-          <span className="rounded-full bg-blue-50 px-3 py-1 text-sm font-medium text-blue-700">
-            {task.status}
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="rounded-full bg-blue-50 px-3 py-1 text-sm font-medium text-blue-700">
+              {task.status}
+            </span>
+
+            <button
+              type="button"
+              onClick={handleDeleteTask}
+              className="rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+            >
+              Delete task
+            </button>
+          </div>
         </div>
       </div>
 
@@ -66,9 +101,7 @@ function TaskDetailsPage() {
             >
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <h3 className="font-semibold">
-                    Session {session.order}
-                  </h3>
+                  <h3 className="font-semibold">Session {session.order}</h3>
 
                   <p className="mt-1 text-sm text-gray-500">
                     {session.topic || "No topic added"}
