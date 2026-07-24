@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { motion } from "framer-motion";
+import { CheckCircle2, Clock, Sparkles } from "lucide-react";
 
 export default function SessionReviewModal({
   session,
@@ -26,63 +28,71 @@ export default function SessionReviewModal({
   };
 
   return (
-    <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/70 p-4 backdrop-blur-xs">
-      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl text-left">
-        <div className="flex items-center justify-between">
-          <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-bold text-blue-800">
-            🎉 Session Time Finished
+    <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm font-mono">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.98 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.98 }}
+        className="w-full max-w-md rounded-lg border border-slate-800 bg-[#0A0A0A] p-6 shadow-2xl text-left"
+      >
+        {/* Header Badge */}
+        <div className="flex items-center justify-between mb-4">
+          <span className="inline-flex items-center gap-1 rounded bg-emerald-500/10 px-2.5 py-0.5 text-[10px] font-bold text-emerald-400 border border-emerald-500/20 uppercase">
+            [SESSION_FINISHED]
           </span>
-          <span className="text-xs font-medium text-gray-500">
-            Worked: <strong className="text-gray-900">{actualMinutesWorked} min</strong>
+          <span className="text-xs text-slate-400 font-bold flex items-center gap-1">
+            <Clock className="w-3.5 h-3.5 text-slate-500" />
+            WORKED: <strong className="text-slate-100">{actualMinutesWorked}m</strong>
           </span>
         </div>
 
-        <h3 className="mt-3 text-xl font-bold text-gray-900">
-          Subtask Completion Review
+        {/* Title */}
+        <h3 className="text-base font-bold text-slate-100 uppercase tracking-tight">
+          COMPLETION_REVIEW
         </h3>
-        <p className="text-xs text-gray-500 mt-1">
-          Topic: <span className="font-semibold text-gray-800">{session.topic || `Session ${session.order}`}</span>
+        <p className="text-xs text-slate-400 mt-1">
+          Topic: <span className="text-slate-200 font-semibold">{session.topic || `Session ${session.order}`}</span>
         </p>
 
-        <form onSubmit={handleSubmit} className="mt-5 space-y-5">
-          {/* Question: Did you finish the subtask? */}
+        <form onSubmit={handleSubmit} className="mt-5 space-y-4">
+          {/* Option Selector */}
           <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-2">
-              Did you complete this subtask/topic?
+            <label className="block text-xs font-semibold text-slate-300 mb-2">
+              DID_YOU_COMPLETE_THIS_BLOCK?
             </label>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={() => setIsSubtaskFinished(true)}
-                className={`rounded-xl border p-3 text-xs font-bold transition-all ${
+                className={`rounded border p-3 text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
                   isSubtaskFinished
-                    ? "border-green-500 bg-green-50 text-green-800 shadow-xs"
-                    : "border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100"
+                    ? "border-emerald-500/50 bg-emerald-500/15 text-emerald-400"
+                    : "border-slate-800 bg-black text-slate-500 hover:bg-slate-900"
                 }`}
               >
-                ✅ Yes, Fully Done!
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> YES_FINISHED
               </button>
 
               <button
                 type="button"
                 onClick={() => setIsSubtaskFinished(false)}
-                className={`rounded-xl border p-3 text-xs font-bold transition-all ${
+                className={`rounded border p-3 text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
                   !isSubtaskFinished
-                    ? "border-amber-500 bg-amber-50 text-amber-800 shadow-xs"
-                    : "border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100"
+                    ? "border-amber-500/50 bg-amber-500/15 text-amber-400"
+                    : "border-slate-800 bg-black text-slate-500 hover:bg-slate-900"
                 }`}
               >
-                ⏳ No, Need More Time
+                <Clock className="w-3.5 h-3.5 text-amber-400" /> NEED_MORE_TIME
               </button>
             </div>
           </div>
 
-          {/* If Not Completed: Ask for Remaining Minutes */}
+          {/* Carryover Input */}
           {!isSubtaskFinished && (
-            <div className="rounded-xl bg-amber-50/60 p-4 border border-amber-200 space-y-2">
-              <label className="block text-xs font-bold text-amber-900">
-                How much more time do you need for this subtask?
+            <div className="rounded border border-amber-500/30 bg-amber-500/5 p-3 space-y-2">
+              <label className="block text-xs font-bold text-amber-400">
+                ADDITIONAL_MINUTES_NEEDED:
               </label>
               <div className="flex items-center gap-2">
                 <input
@@ -91,26 +101,28 @@ export default function SessionReviewModal({
                   step="5"
                   value={remainingMinutes}
                   onChange={(e) => setRemainingMinutes(e.target.value)}
-                  className="w-full rounded-lg border border-amber-300 bg-white p-2.5 text-sm font-bold text-gray-900 outline-none focus:border-amber-500"
+                  className="w-full rounded border border-amber-500/40 bg-black p-2 text-xs font-bold text-slate-100 outline-none focus:border-amber-400"
                 />
-                <span className="text-xs font-medium text-amber-800">Minutes</span>
+                <span className="text-xs font-bold text-amber-400">MINS</span>
               </div>
-              <p className="text-[11px] text-amber-700">
-                TimeLedger will auto-create a carryover session for this subtask.
+              <p className="text-[10px] text-amber-500/80 flex items-center gap-1">
+                <Sparkles className="w-3 h-3" /> Auto-inserts carryover session.
               </p>
             </div>
           )}
 
           <button
             type="submit"
-            className="w-full rounded-xl bg-blue-600 py-3 text-xs font-bold text-white shadow-md hover:bg-blue-700 transition-all"
+            className="w-full rounded border border-emerald-500/40 bg-emerald-500/10 py-3 text-xs font-bold text-emerald-400 hover:bg-emerald-500/20 transition-all uppercase"
           >
-            {isSubtaskFinished
-              ? "Save & Mark Completed"
-              : "Generate Carryover Session ⚡"}
+            {isSubtaskFinished ? (
+              <>MARK_COMPLETED ✨</>
+            ) : (
+              <>GENERATE_CARRYOVER_BLOCK ⚡</>
+            )}
           </button>
         </form>
-      </div>
+      </motion.div>
     </div>
   );
 }

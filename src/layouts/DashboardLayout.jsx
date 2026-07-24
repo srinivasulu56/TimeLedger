@@ -1,23 +1,20 @@
 import { Outlet } from "react-router-dom";
-import Navbar from "../shared/components/Navbar";
 import Sidebar from "../shared/components/Sidebar";
-import { TaskProvider } from "../features/tasks/context/TaskContext";
+import Navbar from "../shared/components/Navbar";
 
-function DashboardLayout() {
+export default function DashboardLayout() {
   return (
-    <TaskProvider>
-      <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#050505] bg-grid-pattern text-slate-200 flex selection:bg-emerald-500 selection:text-black">
+      {/* Sidebar */}
+      <Sidebar />
+
+      {/* Main Workspace */}
+      <div className="flex-1 flex flex-col min-w-0">
         <Navbar />
-        <div className="flex">
-          <Sidebar />
-          <main className="flex-1 p-6">
-            {/* Outlets no longer need manual context props */}
-            <Outlet />
-          </main>
-        </div>
+        <main className="flex-1 p-6 lg:p-8 max-w-7xl w-full mx-auto overflow-y-auto">
+          <Outlet />
+        </main>
       </div>
-    </TaskProvider>
+    </div>
   );
 }
-
-export default DashboardLayout;
