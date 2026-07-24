@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { useOutletContext } from "react-router-dom";
+import { useTasks } from "../context/TaskContext";
 import TaskCard from "../components/TaskCard";
 
 function TasksPage() {
-  const { tasks, setTasks, sessions, setSessions } = useOutletContext();
+  // Cleanly consume tasks, sessions, and the custom addTask action from Context
+  const { tasks, sessions, addTask } = useTasks();
 
   const [title, setTitle] = useState("");
   const [draftTitle, setDraftTitle] = useState("");
@@ -26,9 +27,7 @@ function TasksPage() {
 
   function handleTitleSubmit(event) {
     event.preventDefault();
-
     const cleanedTitle = title.trim();
-
     if (!cleanedTitle) return;
 
     setDraftTitle(cleanedTitle);
@@ -54,10 +53,7 @@ function TasksPage() {
     let order = 1;
 
     while (remainingMinutes > 0) {
-      const plannedDuration = Math.min(
-        preferredDuration,
-        remainingMinutes
-      );
+      const plannedDuration = Math.min(preferredDuration, remainingMinutes);
 
       generatedSessions.push({
         id: crypto.randomUUID(),
@@ -87,8 +83,16 @@ function TasksPage() {
   }
 
   function handleCreateTask() {
+    // Safety guard: Ensure plannedSessions exist
+    if (!plannedSessions || plannedSessions.length === 0) {
+      setPlannerError("No sessions were generated. Please try again.");
+      return;
+    }
+
+    const targetTaskId = plannedSessions[0].taskId;
+
     const newTask = {
-      id: plannedSessions[0].taskId,
+      id: targetTaskId,
       title: draftTitle,
       estimatedMinutes: Number(estimatedMinutes),
       sessionDuration: Number(sessionDuration),
@@ -96,46 +100,47 @@ function TasksPage() {
       createdAt: new Date().toISOString(),
     };
 
-    setTasks((currentTasks) => [...currentTasks, newTask]);
+    // Save task & generated sessions via unified context method
+    addTask(newTask, plannedSessions);
 
-    setSessions((currentSessions) => [
-      ...currentSessions,
-      ...plannedSessions,
-    ]);
-
+    // Close modal and clear state
     resetPlanner();
   }
 
   return (
     <section className="max-w-4xl">
-      <h1 className="text-3xl font-bold">Your Tasks</h1>
+      <h1 className="text-3xl font-bold text-gray-900">Your Tasks</h1>
 
       <p className="mt-2 text-gray-500">
-        You currently have {tasks.length} tasks.
+        You currently have {tasks.length} {tasks.length === 1 ? "task" : "tasks"}.
       </p>
 
+      {/* Quick Start Task Input */}
       <form onSubmit={handleTitleSubmit} className="mt-8 flex gap-3">
         <input
           type="text"
           value={title}
           onChange={(event) => setTitle(event.target.value)}
           placeholder="What do you want to work on?"
-          className="flex-1 rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-blue-600"
+          className="flex-1 rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600"
         />
 
         <button
           type="submit"
-          className="rounded-lg bg-blue-600 px-5 py-3 font-medium text-white hover:bg-blue-700"
+          className="rounded-lg bg-blue-600 px-5 py-3 font-medium text-white hover:bg-blue-700 transition-colors"
         >
           Continue
         </button>
       </form>
 
+      {/* Tasks Grid */}
       <div className="mt-8 grid gap-4 sm:grid-cols-2">
         {tasks.length === 0 ? (
-          <p className="text-gray-500">
-            No tasks yet. Create your first time plan above.
-          </p>
+          <div className="col-span-full rounded-xl border border-dashed border-gray-300 p-8 text-center">
+            <p className="text-gray-500">
+              No tasks yet. Create your first time plan above.
+            </p>
+          </div>
         ) : (
           tasks.map((task) => {
             const sessionCount = sessions.filter(
@@ -153,6 +158,7 @@ function TasksPage() {
         )}
       </div>
 
+      {/* Interactive Time Plan Creator Modal */}
       {isPlannerOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
@@ -167,7 +173,7 @@ function TasksPage() {
                   Create time plan
                 </p>
 
-                <h2 id="planner-title" className="mt-1 text-2xl font-bold">
+                <h2 id="planner-title" className="mt-1 text-2xl font-bold text-gray-900">
                   {draftTitle}
                 </h2>
               </div>
@@ -175,12 +181,13 @@ function TasksPage() {
               <button
                 type="button"
                 onClick={resetPlanner}
-                className="text-sm font-medium text-gray-600 hover:text-gray-900"
+                className="text-sm font-medium text-gray-500 hover:text-gray-900"
               >
                 Close
               </button>
             </div>
 
+            {/* Step 1: Duration Details */}
             {plannerStep === "details" && (
               <form
                 onSubmit={handleGenerateSessions}
@@ -189,7 +196,7 @@ function TasksPage() {
                 <div>
                   <label
                     htmlFor="estimatedMinutes"
-                    className="mb-1 block text-sm font-medium"
+                    className="mb-1 block text-sm font-medium text-gray-700"
                   >
                     Estimated total time in minutes
                   </label>
@@ -210,7 +217,7 @@ function TasksPage() {
                 <div>
                   <label
                     htmlFor="sessionDuration"
-                    className="mb-1 block text-sm font-medium"
+                    className="mb-1 block text-sm font-medium text-gray-700"
                   >
                     Preferred session duration in minutes
                   </label>
@@ -234,27 +241,28 @@ function TasksPage() {
 
                 <button
                   type="submit"
-                  className="rounded-lg bg-blue-600 px-5 py-3 font-medium text-white hover:bg-blue-700"
+                  className="rounded-lg bg-blue-600 px-5 py-3 font-medium text-white hover:bg-blue-700 transition-colors"
                 >
                   Generate sessions
                 </button>
               </form>
             )}
 
+            {/* Step 2: Session Subtask Breakdown */}
             {plannerStep === "sessions" && (
               <div className="mt-6">
-                <p className="text-gray-600">
-                  Add an optional topic or subtask for each session.
+                <p className="text-gray-600 text-sm">
+                  Add an optional topic or subtask for each generated session.
                 </p>
 
-                <div className="mt-5 space-y-3">
+                <div className="mt-5 space-y-3 max-h-[300px] overflow-y-auto pr-1">
                   {plannedSessions.map((session) => (
                     <div
                       key={session.id}
-                      className="rounded-lg border border-gray-200 p-4"
+                      className="rounded-lg border border-gray-200 p-4 bg-gray-50/50"
                     >
-                      <p className="font-medium">
-                        Session {session.order} - {session.plannedDuration} min
+                      <p className="font-semibold text-gray-800 text-sm">
+                        Session {session.order} • {session.plannedDuration} min
                       </p>
 
                       <input
@@ -263,8 +271,8 @@ function TasksPage() {
                         onChange={(event) =>
                           handleTopicChange(session.id, event.target.value)
                         }
-                        placeholder="Topic or subtask (optional)"
-                        className="mt-3 w-full rounded-lg border border-gray-300 px-4 py-2 outline-none focus:border-blue-600"
+                        placeholder="Topic or subtask (e.g. Graph Traversal Basics)"
+                        className="mt-2 w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm outline-none focus:border-blue-600"
                       />
                     </div>
                   ))}
@@ -274,7 +282,7 @@ function TasksPage() {
                   <button
                     type="button"
                     onClick={() => setPlannerStep("details")}
-                    className="rounded-lg border border-gray-300 px-5 py-3 font-medium hover:bg-gray-50"
+                    className="rounded-lg border border-gray-300 px-5 py-3 font-medium text-gray-700 hover:bg-gray-50"
                   >
                     Back
                   </button>
@@ -282,9 +290,9 @@ function TasksPage() {
                   <button
                     type="button"
                     onClick={handleCreateTask}
-                    className="rounded-lg bg-blue-600 px-5 py-3 font-medium text-white hover:bg-blue-700"
+                    className="rounded-lg bg-blue-600 px-5 py-3 font-medium text-white hover:bg-blue-700 transition-colors"
                   >
-                    Create task
+                    Create task plan
                   </button>
                 </div>
               </div>

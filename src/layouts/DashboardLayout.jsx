@@ -1,31 +1,22 @@
-import { useState } from "react";
 import { Outlet } from "react-router-dom";
 import Navbar from "../shared/components/Navbar";
 import Sidebar from "../shared/components/Sidebar";
+import { TaskProvider } from "../features/tasks/context/TaskContext";
 
 function DashboardLayout() {
-  const [tasks, setTasks] = useState([]);
-  const [sessions, setSessions] = useState([]);
-
   return (
-    <div className="min-h-screen">
-      <Navbar />
-
-      <div className="flex">
-        <Sidebar />
-
-        <main className="flex-1 p-6">
-          <Outlet
-            context={{
-              tasks,
-              setTasks,
-              sessions,
-              setSessions,
-            }}
-          />
-        </main>
+    <TaskProvider>
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
+        <div className="flex">
+          <Sidebar />
+          <main className="flex-1 p-6">
+            {/* Outlets no longer need manual context props */}
+            <Outlet />
+          </main>
+        </div>
       </div>
-    </div>
+    </TaskProvider>
   );
 }
 
