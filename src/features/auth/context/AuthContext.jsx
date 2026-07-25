@@ -1,76 +1,65 @@
-import { createContext, useContext, useState } from "react";
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import api from '../services/api';
 
 const AuthContext = createContext(null);
 
-export function AuthProvider({ children }) {
-  const [user, setUser] = useState(() => {
-    const savedUser = localStorage.getItem("timeledger_user");
-    return savedUser ? JSON.parse(savedUser) : null;
-  });
+export const AuthProvider = ({ children }) => {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  const [token, setToken] = useState(() => {
-    return localStorage.getItem("timeledger_token") || null;
-  });
+  // Check if user has an active session on mount
+  useEffect(() => {
+    const fetchUser = async () => {
+      const token = localStorage.getItem('access_token');
+      if (token) {
+        try {
+          const response = await api.get('/auth/me/');
+          setUser(response.data);
+        } catch (err) {
+          console.error("Failed to restore session:", err);
+          logout();
+        }
+      }
+      setLoading(false);
+    };
 
-  const login = (email, password) => {
-    if (email && password) {
-      const mockUser = { email, username: email.split("@")[0] };
-      const mockToken = "mock-jwt-token-12345";
+    fetchUser();
+  }, []);
 
-      setUser(mockUser);
-      setToken(mockToken);
+  const login = async (username, password) => {
+    const response = await api.post('/auth/login/', { username, password });
+    const { access, refresh } = response.data;
+    
+    localStorage.setItem('access_token', access);
+    localStorage.setItem('refresh_token', refresh);
 
-      localStorage.setItem("timeledger_user", JSON.stringify(mockUser));
-      localStorage.setItem("timeledger_token", mockToken);
-
-      return { success: true };
-    }
-    return { success: false, error: "Invalid credentials" };
+    // Fetch user details immediately after login
+    const userRes = await api.get('/auth/me/');
+    setUser(userRes.data);
+    return userRes.data;
   };
 
-  const register = (username, email, password) => {
-    if (username && email && password) {
-      const newUser = { email, username };
-      const mockToken = "mock-jwt-token-67890";
+  const register = async (username, email, password) => {
+    const response = await api.post('/auth/register/', { username, email, password });
+    const { access, refresh, user: newUser } = response.data;
 
-      setUser(newUser);
-      setToken(mockToken);
-
-      localStorage.setItem("timeledger_user", JSON.stringify(newUser));
-      localStorage.setItem("timeledger_token", mockToken);
-
-      return { success: true };
-    }
-    return { success: false, error: "Please fill in all fields" };
+    localStorage.setItem('access_token', access);
+    localStorage.setItem('refresh_token', refresh);
+    setUser(newUser);
+    return newUser;
   };
 
   const logout = () => {
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
     setUser(null);
-    setToken(null);
-    localStorage.removeItem("timeledger_user");
-    localStorage.removeItem("timeledger_token");
   };
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        token,
-        isAuthenticated: !!token,
-        login,
-        register,
-        logout,
-      }}
-    >
-      {children}
+    <AuthContext.Provider value={{ user, login, register, logout, loading }}>
+      {!loading && children}
     </AuthContext.Provider>
   );
-}
+};
 
-export function useAuth() {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error("useAuth must be used within an AuthProvider");
-  }
-  return context;
-}
+export const useAuth = () => useContext(AuthContext);

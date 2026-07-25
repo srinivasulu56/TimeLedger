@@ -1,124 +1,105 @@
-import { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import api from '../services/api';
+import { useAuth } from './AuthContext';
 
 const TaskContext = createContext(null);
 
-export function TaskProvider({ children }) {
-  const [tasks, setTasks] = useState(() => {
-    const saved = localStorage.getItem("timeledger_tasks");
-    return saved ? JSON.parse(saved) : [];
-  });
+export const TaskProvider = ({ children }) => {
+  const { user } = useAuth();
+  const [tasks, setTasks] = useState([]);
+  const [loading, setLoading] = useState(false);
 
-  const [sessions, setSessions] = useState(() => {
-    const saved = localStorage.getItem("timeledger_sessions");
-    return saved ? JSON.parse(saved) : [];
-  });
-
+  // Fetch task plans when user logs in
   useEffect(() => {
-    localStorage.setItem("timeledger_tasks", JSON.stringify(tasks));
-  }, [tasks]);
+    if (user) {
+      fetchTasks();
+    } else {
+      setTasks([]);
+    }
+  }, [user]);
 
-  useEffect(() => {
-    localStorage.setItem("timeledger_sessions", JSON.stringify(sessions));
-  }, [sessions]);
-
-  const addTask = (newTask, newSessions) => {
-    setTasks((prev) => [...prev, newTask]);
-    setSessions((prev) => [...prev, ...newSessions]);
+  const fetchTasks = async () => {
+    setLoading(true);
+    try {
+      const response = await api.get('/tasks/plans/');
+      setTasks(response.data);
+    } catch (err) {
+      console.error("Error fetching tasks:", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const deleteTask = (taskId) => {
-    setTasks((prev) => prev.filter((task) => task.id !== taskId));
-    setSessions((prev) => prev.filter((session) => session.taskId !== taskId));
+  // Create a new task plan with subtask sessions
+  const createTaskPlan = async (taskData) => {
+    try {
+      const response = await api.post('/tasks/plans/', taskData);
+      setTasks((prev) => [response.data, ...prev]);
+      return response.data;
+    } catch (err) {
+      console.error("Error creating task plan:", err);
+      throw err;
+    }
   };
 
-  const updateSessionStatus = (
-    sessionId,
-    status,
-    actualMinutes = 0,
-    pauseLogs = []
-  ) => {
-    setSessions((prev) =>
-      prev.map((session) =>
-        session.id === sessionId
-          ? {
-              ...session,
-              status: status,
-              actualDuration: actualMinutes,
-              pauseLogs: pauseLogs,
-            }
-          : session
-      )
-    );
+  // Delete task plan
+  const deleteTaskPlan = async (taskId) => {
+    try {
+      await api.delete(`/tasks/plans/${taskId}/`);
+      setTasks((prev) => prev.filter((t) => t.id !== taskId));
+    } catch (err) {
+      console.error("Error deleting task:", err);
+    }
   };
 
-  // 🚀 Core Engine: Create a Carry-Forward Session & Insert it Immediately Next
-  const carryForwardSession = (
-    completedSession,
-    remainingMinutesNeeded,
-    actualMinutesWorked,
-    pauseLogs = []
-  ) => {
-    setSessions((prev) => {
-      // 1. Mark the current session as completed
-      const updatedPrev = prev.map((s) =>
-        s.id === completedSession.id
-          ? {
-              ...s,
-              status: "Completed (Incomplete Subtask)",
-              actualDuration: actualMinutesWorked,
-              pauseLogs,
-            }
-          : s
-      );
-
-      // 2. Create the carryover session immediately after the completed one
-      const carryoverSession = {
-        id: crypto.randomUUID(),
-        taskId: completedSession.taskId,
-        order: completedSession.order + 1,
-        topic: `${completedSession.topic || "Subtask"} (Carryover)`,
-        plannedDuration: Number(remainingMinutesNeeded),
-        actualDuration: null,
-        status: "planned",
-        isCarryover: true,
-      };
-
-      // 3. Shift the order of all subsequent sessions for THIS task by +1
-      const finalSessions = updatedPrev.map((session) => {
-        if (
-          session.taskId === completedSession.taskId &&
-          session.order > completedSession.order
-        ) {
-          return { ...session, order: session.order + 1 };
-        }
-        return session;
+  // Update session status (e.g. 'Completed')
+  const updateSessionStatus = async (sessionId, status, actualDuration = null) => {
+    try {
+      const response = await api.patch(`/tasks/sessions/${sessionId}/status/`, {
+        status,
+        actual_duration: actualDuration
       });
 
-      // 4. Return combined list
-      return [...finalSessions, carryoverSession];
-    });
+      // Update state locally
+      setTasks((prevTasks) =>
+        prevTasks.map((task) => ({
+          ...task,
+          sessions: task.sessions.map((sess) =>
+            sess.id === sessionId ? { ...sess, ...response.data } : sess
+          ),
+        }))
+      );
+    } catch (err) {
+      console.error("Error updating session status:", err);
+    }
+  };
+
+  // Log a pause interruption event
+  const logSessionPause = async (sessionId, pauseData) => {
+    try {
+      await api.post(`/tasks/sessions/${sessionId}/pause/`, pauseData);
+      // Refresh task plans to fetch updated nested pause logs
+      fetchTasks();
+    } catch (err) {
+      console.error("Error logging pause:", err);
+    }
   };
 
   return (
     <TaskContext.Provider
       value={{
         tasks,
-        sessions,
-        addTask,
-        deleteTask,
+        loading,
+        fetchTasks,
+        createTaskPlan,
+        deleteTaskPlan,
         updateSessionStatus,
-        carryForwardSession,
+        logSessionPause,
       }}
     >
       {children}
     </TaskContext.Provider>
   );
-}
+};
 
-export function useTasks() {
-  const context = useContext(TaskContext);
-  if (!context) {
-    throw new Error("useTasks must be used within a TaskProvider");
-  }
-  return context;
-}
+export const useTasks = () => useContext(TaskContext);
