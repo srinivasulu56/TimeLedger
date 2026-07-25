@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowRight, Lock, Mail, User } from "lucide-react";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../../../context/AuthContext";
 import PageTransition from "../../../shared/components/PageTransition";
 
 export default function RegisterPage() {
@@ -9,19 +9,36 @@ export default function RegisterPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const { register } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    setLoading(true);
 
-    const result = register(username, email, password);
-    if (result.success) {
+    try {
+      // 1. Await the async backend call to Django
+      await register(username, email, password);
+      
+      // 2. Navigate upon successful account provision & token storage
       navigate("/dashboard");
-    } else {
-      setError(result.error);
+    } catch (err) {
+      console.error("Registration error:", err);
+      
+      // 3. Extract detailed DRF validation errors if present
+      const djangoError =
+        err.response?.data?.username?.[0] ||
+        err.response?.data?.email?.[0] ||
+        err.response?.data?.password?.[0] ||
+        err.response?.data?.detail ||
+        "Failed to create operator account. Please check inputs.";
+
+      setError(djangoError);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -100,9 +117,11 @@ export default function RegisterPage() {
 
           <button
             type="submit"
-            className="w-full flex items-center justify-center gap-1.5 rounded border border-cyan-500/40 bg-cyan-500/10 py-3 text-xs font-bold text-cyan-400 hover:bg-cyan-500/20 hover:border-cyan-400 transition-all uppercase"
+            disabled={loading}
+            className="w-full flex items-center justify-center gap-1.5 rounded border border-cyan-500/40 bg-cyan-500/10 py-3 text-xs font-bold text-cyan-400 hover:bg-cyan-500/20 hover:border-cyan-400 disabled:opacity-50 transition-all uppercase cursor-pointer"
           >
-            PROVISION_ACCOUNT <ArrowRight className="w-4 h-4" />
+            {loading ? "PROVISIONING..." : "PROVISION_ACCOUNT"}{" "}
+            <ArrowRight className="w-4 h-4" />
           </button>
         </form>
 

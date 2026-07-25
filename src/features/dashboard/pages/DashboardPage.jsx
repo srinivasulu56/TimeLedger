@@ -13,14 +13,27 @@ import {
   TrendingUp,
   Lightbulb,
 } from "lucide-react";
-import { useTasks } from "../../tasks/context/TaskContext";
+import { useTasks } from "../../../context/TaskContext";
 import SessionTimerModal from "../../tasks/components/SessionTimerModal";
 import PageTransition from "../../../shared/components/PageTransition";
 
 export default function DashboardPage() {
   const navigate = useNavigate();
-  const { tasks, sessions, updateSessionStatus, carryForwardSession } = useTasks();
+  const { tasks = [], sessions: contextSessions = [], loading, updateSessionStatus, carryForwardSession } = useTasks();
   const [activeSession, setActiveSession] = useState(null);
+
+  // Safely extract tasks array
+  const safeTasks = Array.isArray(tasks) ? tasks : [];
+
+  // Extract all sessions (either passed directly or nested inside Django task plan responses)
+  const safeSessions = useMemo(() => {
+    if (Array.isArray(contextSessions) && contextSessions.length > 0) {
+      return contextSessions;
+    }
+    return safeTasks.flatMap((task) =>
+      (task.sessions || []).map((s) => ({ ...s, taskId: s.taskId || task.id }))
+    );
+  }, [safeTasks, contextSessions]);
 
   // 1. Calculate Comprehensive Dashboard & Task-Specific Telemetry
   const telemetry = useMemo(() => {
@@ -29,15 +42,16 @@ export default function DashboardPage() {
     const globalPauseReasonCounts = {};
 
     // Analyze Global Stats
-    sessions.forEach((session) => {
-      if (session.status?.startsWith("Completed")) {
+    safeSessions.forEach((session) => {
+      if (session.status?.startsWith("Completed") || session.status === "completed") {
         completedSessionsCount += 1;
-        totalMinutesWorkedToday += session.actualDuration || session.plannedDuration || 0;
+        totalMinutesWorkedToday += session.actual_duration || session.actualDuration || session.planned_duration || session.plannedDuration || 0;
       }
 
-      if (session.pauseLogs && session.pauseLogs.length > 0) {
-        session.pauseLogs.forEach((log) => {
-          const category = log.reasonCategory || "Other Reason";
+      const logs = session.pause_logs || session.pauseLogs || [];
+      if (logs.length > 0) {
+        logs.forEach((log) => {
+          const category = log.reason_category || log.reasonCategory || "Other Reason";
           globalPauseReasonCounts[category] = (globalPauseReasonCounts[category] || 0) + 1;
         });
       }
@@ -56,27 +70,26 @@ export default function DashboardPage() {
     });
 
     // 2. Per-Task Telemetry Calculations
-    const taskDiagnostics = tasks.map((task) => {
-      const taskSessions = sessions.filter((s) => s.taskId === task.id);
+    const taskDiagnostics = safeTasks.map((task) => {
+      const taskSessions = safeSessions.filter((s) => s.taskId === task.id || task.sessions?.some((ts) => ts.id === s.id));
       const totalBlocks = taskSessions.length;
       const completedBlocks = taskSessions.filter((s) =>
-        s.status?.startsWith("Completed")
+        s.status?.startsWith("Completed") || s.status === "completed"
       );
 
       const actualMinutes = completedBlocks.reduce(
-        (sum, s) => sum + (s.actualDuration || s.plannedDuration || 0),
+        (sum, s) => sum + (s.actual_duration || s.actualDuration || s.planned_duration || s.plannedDuration || 0),
         0
       );
 
       // Calculate task-specific top disruption
       const taskPauseCounts = {};
       taskSessions.forEach((s) => {
-        if (s.pauseLogs) {
-          s.pauseLogs.forEach((log) => {
-            const cat = log.reasonCategory || "Other";
-            taskPauseCounts[cat] = (taskPauseCounts[cat] || 0) + 1;
-          });
-        }
+        const logs = s.pause_logs || s.pauseLogs || [];
+        logs.forEach((log) => {
+          const cat = log.reason_category || log.reasonCategory || "Other";
+          taskPauseCounts[cat] = (taskPauseCounts[cat] || 0) + 1;
+        });
       });
 
       let taskTopDisruption = "NONE";
@@ -89,7 +102,7 @@ export default function DashboardPage() {
       });
 
       // Variance calculation
-      const estimatedMinutes = task.estimatedMinutes || 0;
+      const estimatedMinutes = task.estimated_minutes || task.estimatedMinutes || 0;
       const varianceMinutes = actualMinutes - estimatedMinutes;
 
       return {
@@ -134,19 +147,19 @@ export default function DashboardPage() {
     return {
       hoursWorkedToday,
       completedSessionsCount,
-      totalTasksCount: tasks.length,
+      totalTasksCount: safeTasks.length,
       topGlobalDistraction,
       taskDiagnostics,
       recommendations,
     };
-  }, [tasks, sessions]);
+  }, [safeTasks, safeSessions]);
 
   // Upcoming Executable Sessions
   const pendingSessions = useMemo(() => {
-    return sessions
+    return safeSessions
       .filter((s) => s.status === "planned" || s.status === "Pending")
       .sort((a, b) => a.order - b.order);
-  }, [sessions]);
+  }, [safeSessions]);
 
   function handleCompleteFull(sessionId, status, actualMinutes, pauseLogs) {
     updateSessionStatus(sessionId, status, actualMinutes, pauseLogs);
@@ -154,8 +167,18 @@ export default function DashboardPage() {
   }
 
   function handleCarryForward(session, remainingMinutes, actualMinutesWorked, pauseLogs) {
-    carryForwardSession(session, remainingMinutes, actualMinutesWorked, pauseLogs);
+    if (carryForwardSession) {
+      carryForwardSession(session, remainingMinutes, actualMinutesWorked, pauseLogs);
+    }
     setActiveSession(null);
+  }
+
+  if (loading) {
+    return (
+      <div className="p-8 text-cyan-400 font-mono text-xs uppercase tracking-widest flex items-center gap-2">
+        <Terminal className="w-4 h-4 animate-spin" /> [LOADING_OPERATOR_TELEMETRY...]
+      </div>
+    );
   }
 
   return (
@@ -258,7 +281,7 @@ export default function DashboardPage() {
                           {t.completedBlocksCount}/{t.totalBlocks} BLOCKS COMPLETED
                         </span>
                       </td>
-                      <td className="p-3 text-slate-400">{t.estimatedMinutes}m</td>
+                      <td className="p-3 text-slate-400">{t.estimated_minutes || t.estimatedMinutes || 0}m</td>
                       <td className="p-3 text-slate-200 font-bold">{t.actualMinutes}m</td>
                       <td className="p-3">
                         {t.varianceMinutes > 0 ? (
@@ -325,13 +348,13 @@ export default function DashboardPage() {
             ) : (
               <div className="space-y-2">
                 {pendingSessions.slice(0, 3).map((session) => {
-                  const parentTask = tasks.find((t) => t.id === session.taskId);
+                  const parentTask = safeTasks.find((t) => t.id === session.taskId || t.sessions?.some((s) => s.id === session.id));
 
                   return (
                     <div
                       key={session.id}
                       className={`rounded-lg border p-4 shadow-sm flex items-center justify-between transition-all ${
-                        session.isCarryover
+                        session.is_carryover || session.isCarryover
                           ? "bg-amber-500/5 border-amber-500/30"
                           : "bg-[#0A0A0A] border-slate-800 hover:border-slate-700"
                       }`}
@@ -341,7 +364,7 @@ export default function DashboardPage() {
                           <span className="text-[10px] font-bold text-slate-400 bg-slate-900 border border-slate-800 px-2 py-0.5 rounded">
                             {parentTask?.title || "TASK"}
                           </span>
-                          {session.isCarryover && (
+                          {(session.is_carryover || session.isCarryover) && (
                             <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded flex items-center gap-1">
                               <Sparkles className="w-3 h-3" /> CARRYOVER
                             </span>
@@ -352,7 +375,7 @@ export default function DashboardPage() {
                           Block #{session.order}: {session.topic || "Work Session"}
                         </h3>
                         <p className="text-xs text-slate-500 mt-0.5">
-                          Duration: {session.plannedDuration}m
+                          Duration: {session.planned_duration || session.plannedDuration}m
                         </p>
                       </div>
 

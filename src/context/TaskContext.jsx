@@ -64,7 +64,7 @@ export const TaskProvider = ({ children }) => {
       setTasks((prevTasks) =>
         prevTasks.map((task) => ({
           ...task,
-          sessions: task.sessions.map((sess) =>
+          sessions: (task.sessions || []).map((sess) =>
             sess.id === sessionId ? { ...sess, ...response.data } : sess
           ),
         }))
@@ -92,7 +92,10 @@ export const TaskProvider = ({ children }) => {
         loading,
         fetchTasks,
         createTaskPlan,
+        createTask: createTaskPlan, // Alias for component compatibility
+        addTask: createTaskPlan,    // Alias for component compatibility
         deleteTaskPlan,
+        deleteTask: deleteTaskPlan, // Alias for component compatibility
         updateSessionStatus,
         logSessionPause,
       }}
@@ -102,4 +105,10 @@ export const TaskProvider = ({ children }) => {
   );
 };
 
-export const useTasks = () => useContext(TaskContext);
+export const useTasks = () => {
+  const context = useContext(TaskContext);
+  if (!context) {
+    throw new Error("useTasks must be used within a TaskProvider");
+  }
+  return context;
+};

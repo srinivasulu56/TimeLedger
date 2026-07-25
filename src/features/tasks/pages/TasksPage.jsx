@@ -1,15 +1,19 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, CheckSquare, Trash2, Sparkles, X, Terminal } from "lucide-react";
-import { useTasks } from "../context/TaskContext";
+import { useTasks } from "../../../context/TaskContext";
 import TaskCard from "../components/TaskCard";
 import PageTransition from "../../../shared/components/PageTransition";
 
 export default function TasksPage() {
-  const { tasks, addTask } = useTasks();
+  const context = useTasks();
+  const tasks = context.tasks || [];
+  const addTask = context.addTask || context.createTaskPlan || context.createTask;
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [step, setStep] = useState(1);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
   // Step 1 Form State
   const [title, setTitle] = useState("");
@@ -20,9 +24,11 @@ export default function TasksPage() {
   // Step 2 Form State
   const [subtasks, setSubtasks] = useState([]);
 
-  const calculatedTotalMinutes = estimatedHours * 60;
-  const calculatedSessionCount = Math.ceil(
-    calculatedTotalMinutes / preferredSessionMins
+  const safeTasks = Array.isArray(tasks) ? tasks : [];
+  const calculatedTotalMinutes = Math.round(Number(estimatedHours) * 60);
+  const calculatedSessionCount = Math.max(
+    1,
+    Math.ceil(calculatedTotalMinutes / preferredSessionMins)
   );
 
   const handleNextStep = (e) => {
@@ -32,7 +38,7 @@ export default function TasksPage() {
     if (step === 1) {
       const initialSubtasks = Array.from(
         { length: calculatedSessionCount },
-        (_, i) => `${title} - Part ${i + 1}`
+        (_, i) => `${title.trim()} - Part ${i + 1}`
       );
       setSubtasks(initialSubtasks);
       setStep(2);
@@ -46,7 +52,7 @@ export default function TasksPage() {
   };
 
   const handleAddSubtask = () => {
-    setSubtasks([...subtasks, `${title} - Part ${subtasks.length + 1}`]);
+    setSubtasks([...subtasks, `${title.trim()} - Part ${subtasks.length + 1}`]);
   };
 
   const handleRemoveSubtask = (index) => {
@@ -54,37 +60,55 @@ export default function TasksPage() {
     setSubtasks(subtasks.filter((_, i) => i !== index));
   };
 
-  const handleFinalSubmit = (e) => {
+  const handleFinalSubmit = async (e) => {
     e.preventDefault();
+    setIsSubmitting(true);
+    setErrorMessage("");
 
-    const taskId = crypto.randomUUID();
+    try {
+      if (typeof addTask !== "function") {
+        throw new Error("Task creation method is not defined in TaskContext.");
+      }
 
-    const generatedSessions = subtasks.map((topic, index) => ({
-      id: crypto.randomUUID(),
-      taskId: taskId,
-      order: index + 1,
-      topic: topic.trim() || `Session ${index + 1}`,
-      plannedDuration: Number(preferredSessionMins),
-      actualDuration: null,
-      status: "planned",
-      isCarryover: false,
-    }));
+      const generatedSessions = subtasks.map((topic, index) => ({
+        order: index + 1,
+        topic: topic.trim() || `Session ${index + 1}`,
+        planned_duration: Number(preferredSessionMins),
+        status: "planned",
+        is_carryover: false,
+      }));
 
-    const newTask = {
-      id: taskId,
-      title: title.trim(),
-      category: category,
-      estimatedMinutes: calculatedTotalMinutes,
-      sessionDuration: Number(preferredSessionMins),
-      createdAt: new Date().toISOString(),
-    };
+      // Construct payload compatible with Django views.py expected body
+      const newTaskPayload = {
+        title: title.trim(),
+        category: category,
+        estimated_minutes: calculatedTotalMinutes,
+        session_duration: Number(preferredSessionMins),
+        subtasks: subtasks.map((s) => s.trim()), // Sends string array expected by views.py
+        sessions: generatedSessions,            // Fallback object array
+      };
 
-    addTask(newTask, generatedSessions);
+      await addTask(newTaskPayload);
 
-    // Reset & Close
-    setTitle("");
-    setStep(1);
-    setIsModalOpen(false);
+      // Reset form state & close modal
+      setTitle("");
+      setCategory("Development");
+      setEstimatedHours(2);
+      setPreferredSessionMins(45);
+      setSubtasks([]);
+      setStep(1);
+      setIsModalOpen(false);
+    } catch (err) {
+      console.error("Failed to initialize task plan:", err);
+      setErrorMessage(
+        err.response?.data?.detail ||
+          err.response?.data?.title?.[0] ||
+          err.message ||
+          "Failed to save task plan to database. Please try again."
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -96,7 +120,7 @@ export default function TasksPage() {
             <h1 className="text-2xl font-bold text-slate-100 uppercase tracking-tight flex items-center gap-2">
               <Terminal className="w-5 h-5 text-emerald-400" /> Task Plans
               <span className="text-xs font-semibold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                {tasks.length} ACTIVE
+                {safeTasks.length} ACTIVE
               </span>
             </h1>
             <p className="text-xs text-slate-400 mt-1">
@@ -107,16 +131,17 @@ export default function TasksPage() {
           <button
             onClick={() => {
               setStep(1);
+              setErrorMessage("");
               setIsModalOpen(true);
             }}
-            className="flex items-center gap-2 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-4 py-2 text-xs font-bold text-emerald-400 hover:bg-emerald-500/20 transition-all"
+            className="flex items-center gap-2 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-4 py-2 text-xs font-bold text-emerald-400 hover:bg-emerald-500/20 transition-all cursor-pointer"
           >
             <Plus className="w-4 h-4" /> CREATE_TASK_PLAN
           </button>
         </div>
 
         {/* Task Cards Grid */}
-        {tasks.length === 0 ? (
+        {safeTasks.length === 0 ? (
           <div className="rounded-lg border border-dashed border-slate-800 bg-[#0A0A0A] p-12 text-center">
             <CheckSquare className="w-8 h-8 text-slate-600 mx-auto mb-3" />
             <h3 className="text-sm font-bold text-slate-300">// NO_ACTIVE_PLANS</h3>
@@ -126,13 +151,13 @@ export default function TasksPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {tasks.map((task) => (
+            {safeTasks.map((task) => (
               <TaskCard key={task.id} task={task} />
             ))}
           </div>
         )}
 
-        {/* 🔮 Cyberpunk Creation Modal */}
+        {/* Creation Modal */}
         <AnimatePresence>
           {isModalOpen && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm">
@@ -142,11 +167,10 @@ export default function TasksPage() {
                 exit={{ opacity: 0, scale: 0.98 }}
                 className="relative w-full max-w-lg rounded-lg border border-slate-800 bg-[#0A0A0A] p-6 shadow-2xl text-left flex flex-col justify-between max-h-[90vh] overflow-y-auto"
               >
-                {/* Custom scrollbar hide wrapper */}
                 <div>
                   <button
                     onClick={() => setIsModalOpen(false)}
-                    className="absolute right-4 top-4 p-1 rounded text-slate-500 hover:text-slate-200 hover:bg-slate-800"
+                    className="absolute right-4 top-4 p-1 rounded text-slate-500 hover:text-slate-200 hover:bg-slate-800 cursor-pointer"
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -165,6 +189,12 @@ export default function TasksPage() {
                       : "Refine block topics or add/remove focus steps."}
                   </p>
                 </div>
+
+                {errorMessage && (
+                  <div className="mt-4 p-2.5 rounded bg-red-500/10 border border-red-500/30 text-xs font-bold text-red-400">
+                    ⚠️ PLAN_ERROR: {errorMessage}
+                  </div>
+                )}
 
                 {step === 1 ? (
                   <form onSubmit={handleNextStep} className="mt-4 space-y-4">
@@ -224,7 +254,7 @@ export default function TasksPage() {
                             key={mins}
                             type="button"
                             onClick={() => setPreferredSessionMins(mins)}
-                            className={`rounded border p-2 text-xs font-bold transition-all ${
+                            className={`rounded border p-2 text-xs font-bold transition-all cursor-pointer ${
                               preferredSessionMins === mins
                                 ? "border-emerald-500 bg-emerald-500/10 text-emerald-400"
                                 : "border-slate-800 bg-black text-slate-500 hover:bg-slate-900"
@@ -246,7 +276,7 @@ export default function TasksPage() {
 
                     <button
                       type="submit"
-                      className="w-full rounded border border-emerald-500/40 bg-emerald-500/10 py-3 text-xs font-bold text-emerald-400 hover:bg-emerald-500/20 transition-all"
+                      className="w-full rounded border border-emerald-500/40 bg-emerald-500/10 py-3 text-xs font-bold text-emerald-400 hover:bg-emerald-500/20 transition-all cursor-pointer"
                     >
                       CONFIGURE_TOPICS →
                     </button>
@@ -270,7 +300,7 @@ export default function TasksPage() {
                             <button
                               type="button"
                               onClick={() => handleRemoveSubtask(index)}
-                              className="p-1.5 rounded text-slate-600 hover:text-red-400 hover:bg-red-500/10 transition-all"
+                              className="p-1.5 rounded text-slate-600 hover:text-red-400 hover:bg-red-500/10 transition-all cursor-pointer"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
@@ -282,7 +312,7 @@ export default function TasksPage() {
                     <button
                       type="button"
                       onClick={handleAddSubtask}
-                      className="w-full py-2 rounded border border-dashed border-slate-800 text-xs font-bold text-slate-400 hover:bg-slate-900 transition-all flex items-center justify-center gap-1"
+                      className="w-full py-2 rounded border border-dashed border-slate-800 text-xs font-bold text-slate-400 hover:bg-slate-900 transition-all flex items-center justify-center gap-1 cursor-pointer"
                     >
                       <Plus className="w-3.5 h-3.5" /> ADD_BLOCK
                     </button>
@@ -291,15 +321,17 @@ export default function TasksPage() {
                       <button
                         type="button"
                         onClick={() => setStep(1)}
-                        className="rounded border border-slate-800 bg-black px-4 py-2.5 text-xs font-semibold text-slate-400 hover:bg-slate-900"
+                        className="rounded border border-slate-800 bg-black px-4 py-2.5 text-xs font-semibold text-slate-400 hover:bg-slate-900 cursor-pointer"
                       >
                         ← BACK
                       </button>
                       <button
                         type="submit"
-                        className="flex-1 rounded border border-emerald-500/40 bg-emerald-500/10 py-2.5 text-xs font-bold text-emerald-400 hover:bg-emerald-500/20 transition-all flex items-center justify-center gap-1"
+                        disabled={isSubmitting}
+                        className="flex-1 rounded border border-emerald-500/40 bg-emerald-500/10 py-2.5 text-xs font-bold text-emerald-400 hover:bg-emerald-500/20 disabled:opacity-50 transition-all flex items-center justify-center gap-1 cursor-pointer"
                       >
-                        <Sparkles className="w-3.5 h-3.5" /> INITIALIZE_PLAN
+                        <Sparkles className="w-3.5 h-3.5" />
+                        {isSubmitting ? "INITIALIZING..." : "INITIALIZE_PLAN"}
                       </button>
                     </div>
                   </form>

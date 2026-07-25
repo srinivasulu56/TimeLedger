@@ -1,26 +1,39 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowRight, Lock, Mail } from "lucide-react";
-import { useAuth } from "../context/AuthContext";
+import { ArrowRight, Lock, User } from "lucide-react";
+import { useAuth } from "../../../context/AuthContext";
 import PageTransition from "../../../shared/components/PageTransition";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState(""); 
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    setLoading(true);
 
-    const result = login(email, password);
-    if (result.success) {
-      navigate("/dashboard");
-    } else {
-      setError(result.error);
+    try {
+      // 1. Authenticate with Django backend
+      await login(identifier, password);
+
+      // 2. Try navigating to '/' (or change to '/dashboard' if your route specifically uses that)
+      navigate("/");
+    } catch (err) {
+      console.error("Login error details:", err);
+
+      const djangoError =
+        err.response?.data?.detail ||
+        "Invalid operator credentials. Access denied.";
+
+      setError(djangoError);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -48,16 +61,16 @@ export default function LoginPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-xs font-bold text-slate-300 mb-1">
-              EMAIL_ADDRESS
+              OPERATOR_HANDLE
             </label>
             <div className="relative">
-              <Mail className="w-4 h-4 text-slate-600 absolute left-3 top-3" />
+              <User className="w-4 h-4 text-slate-600 absolute left-3 top-3" />
               <input
-                type="email"
+                type="text"
                 required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="operator@timeledger.io"
+                value={identifier}
+                onChange={(e) => setIdentifier(e.target.value)}
+                placeholder="srinivas"
                 className="w-full rounded border border-slate-800 bg-black pl-9 pr-3 py-2.5 text-xs text-slate-100 placeholder-slate-600 outline-none focus:border-cyan-400 transition-all"
               />
             </div>
@@ -82,9 +95,11 @@ export default function LoginPage() {
 
           <button
             type="submit"
-            className="w-full flex items-center justify-center gap-1.5 rounded border border-cyan-500/40 bg-cyan-500/10 py-3 text-xs font-bold text-cyan-400 hover:bg-cyan-500/20 hover:border-cyan-400 transition-all uppercase"
+            disabled={loading}
+            className="w-full flex items-center justify-center gap-1.5 rounded border border-cyan-500/40 bg-cyan-500/10 py-3 text-xs font-bold text-cyan-400 hover:bg-cyan-500/20 hover:border-cyan-400 disabled:opacity-50 transition-all uppercase cursor-pointer"
           >
-            INITIALIZE_SESSION <ArrowRight className="w-4 h-4" />
+            {loading ? "AUTHENTICATING..." : "INITIALIZE_SESSION"}{" "}
+            <ArrowRight className="w-4 h-4" />
           </button>
         </form>
 

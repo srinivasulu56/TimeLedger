@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Play, Pause, CheckCircle2, X, Terminal } from "lucide-react";
+import { Play, Pause, CheckCircle2, X } from "lucide-react";
 import PauseReasonModal from "./PauseReasonModal";
 import SessionReviewModal from "./SessionReviewModal";
 
@@ -10,7 +10,8 @@ export default function SessionTimerModal({
   onCompleteFull,
   onCarryForward,
 }) {
-  const totalSeconds = session.plannedDuration * 60;
+  const plannedDuration = session.planned_duration || session.plannedDuration || 25;
+  const totalSeconds = plannedDuration * 60;
 
   const [secondsLeft, setSecondsLeft] = useState(totalSeconds);
   const [isRunning, setIsRunning] = useState(false);
@@ -18,7 +19,7 @@ export default function SessionTimerModal({
 
   // Pause tracking state
   const [isPauseReasonModalOpen, setIsPauseReasonModalOpen] = useState(false);
-  const [pauseLogs, setPauseLogs] = useState(session.pauseLogs || []);
+  const [pauseLogs, setPauseLogs] = useState(session.pause_logs || session.pauseLogs || []);
   const pauseStartTimeRef = useRef(null);
 
   const timerRef = useRef(null);
@@ -82,17 +83,18 @@ export default function SessionTimerModal({
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm font-mono">
+      {/* Responsive Backdrop Container with auto-scroll fallback */}
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-3 sm:p-4 backdrop-blur-sm font-mono overflow-y-auto">
         <motion.div
           initial={{ opacity: 0, scale: 0.98 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.98 }}
-          className="relative w-full max-w-sm rounded-lg border border-slate-800 bg-[#0A0A0A] p-6 shadow-2xl text-center flex flex-col justify-between"
+          className="relative w-full max-w-sm rounded-lg border border-slate-800 bg-[#0A0A0A] p-4 sm:p-6 shadow-2xl text-center flex flex-col justify-between my-auto max-h-[95vh]"
         >
           {/* Close button */}
           <button
             onClick={onClose}
-            className="absolute right-4 top-4 p-1 text-slate-500 hover:text-slate-200 hover:bg-slate-800 rounded"
+            className="absolute right-3 top-3 sm:right-4 sm:top-4 p-1 text-slate-500 hover:text-slate-200 hover:bg-slate-800 rounded cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -100,19 +102,19 @@ export default function SessionTimerModal({
           {/* Session Header */}
           <div>
             <span className="inline-block rounded bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-400 border border-emerald-500/20 uppercase">
-              SESSION_#{session.order}
+              SESSION_#{session.order || 1}
             </span>
-            <h2 className="mt-2 text-lg font-bold text-slate-100 uppercase tracking-tight">
-              {session.topic || `SESSION_${session.order}`}
+            <h2 className="mt-1.5 sm:mt-2 text-base sm:text-lg font-bold text-slate-100 uppercase tracking-tight truncate px-4">
+              {session.topic || `SESSION_${session.order || 1}`}
             </h2>
-            <p className="text-[11px] text-slate-500 mt-0.5">
-              PLANNED_DURATION: {session.plannedDuration}m
+            <p className="text-[10px] sm:text-[11px] text-slate-500 mt-0.5">
+              PLANNED_DURATION: {plannedDuration}m
             </p>
           </div>
 
-          {/* Clock */}
-          <div className="relative my-4 flex items-center justify-center">
-            <svg className="w-44 h-44 -rotate-90 transform" viewBox="0 0 200 200">
+          {/* Responsive Responsive Radial SVG Clock */}
+          <div className="relative my-2 sm:my-4 flex items-center justify-center">
+            <svg className="w-36 h-36 sm:w-44 sm:h-44 -rotate-90 transform" viewBox="0 0 200 200">
               <circle
                 cx="100"
                 cy="100"
@@ -135,10 +137,10 @@ export default function SessionTimerModal({
             </svg>
 
             <div className="absolute flex flex-col items-center">
-              <span className="text-3xl font-bold font-mono text-slate-100 tracking-wider">
+              <span className="text-2xl sm:text-3xl font-bold font-mono text-slate-100 tracking-wider">
                 {formatTime(secondsLeft)}
               </span>
-              <span className="text-[10px] font-bold text-slate-500 mt-0.5 uppercase tracking-widest">
+              <span className="text-[9px] sm:text-[10px] font-bold text-slate-500 mt-0.5 uppercase tracking-widest">
                 [{isRunning ? "FOCUSING" : "PAUSED"}]
               </span>
             </div>
@@ -146,17 +148,17 @@ export default function SessionTimerModal({
 
           {/* Pause Counter Badge */}
           {pauseLogs.length > 0 && (
-            <div className="mb-3 inline-flex items-center justify-center gap-1.5 rounded bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 text-[11px] font-bold text-amber-400">
+            <div className="mb-2 sm:mb-3 inline-flex items-center justify-center gap-1.5 rounded bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 text-[10px] sm:text-[11px] font-bold text-amber-400">
               ⚠️ PAUSED_{pauseLogs.length}_TIMES
             </div>
           )}
 
-          {/* Controls */}
-          <div className="flex items-center justify-center gap-2 pt-2">
+          {/* Responsive Action Controls */}
+          <div className="flex items-center justify-center gap-2 pt-1 sm:pt-2">
             {!isRunning ? (
               <button
                 onClick={() => setIsRunning(true)}
-                className="flex-1 flex items-center justify-center gap-1.5 rounded border border-emerald-500/40 bg-emerald-500/10 py-2.5 text-xs font-bold text-emerald-400 hover:bg-emerald-500/20 transition-all"
+                className="flex-1 flex items-center justify-center gap-1.5 rounded border border-emerald-500/40 bg-emerald-500/10 py-2.5 text-xs font-bold text-emerald-400 hover:bg-emerald-500/20 transition-all cursor-pointer"
               >
                 <Play className="w-3.5 h-3.5 fill-emerald-400" />
                 {secondsLeft === totalSeconds ? "START_FOCUS" : "RESUME"}
@@ -164,7 +166,7 @@ export default function SessionTimerModal({
             ) : (
               <button
                 onClick={handlePauseClick}
-                className="flex-1 flex items-center justify-center gap-1.5 rounded border border-amber-500/40 bg-amber-500/10 py-2.5 text-xs font-bold text-amber-400 hover:bg-amber-500/20 transition-all"
+                className="flex-1 flex items-center justify-center gap-1.5 rounded border border-amber-500/40 bg-amber-500/10 py-2.5 text-xs font-bold text-amber-400 hover:bg-amber-500/20 transition-all cursor-pointer"
               >
                 <Pause className="w-3.5 h-3.5 fill-amber-400" />
                 PAUSE
@@ -176,7 +178,7 @@ export default function SessionTimerModal({
                 setIsRunning(false);
                 setIsReviewOpen(true);
               }}
-              className="flex items-center gap-1 rounded border border-slate-800 bg-black px-3 py-2.5 text-xs font-semibold text-slate-400 hover:text-slate-100 hover:bg-slate-900 transition-all"
+              className="flex items-center gap-1 rounded border border-slate-800 bg-black px-3 py-2.5 text-xs font-semibold text-slate-400 hover:text-slate-100 hover:bg-slate-900 transition-all cursor-pointer"
             >
               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
               FINISH
@@ -184,7 +186,7 @@ export default function SessionTimerModal({
           </div>
         </motion.div>
 
-        {/* Modals */}
+        {/* Nested Modals */}
         {isPauseReasonModalOpen && (
           <PauseReasonModal
             pauseDurationMins={getPauseDurationInMinutes()}

@@ -1,6 +1,6 @@
 import { Routes, Route, Navigate } from "react-router-dom";
-import { AuthProvider } from "../features/auth/context/AuthContext.jsx";
-import { TaskProvider } from "../features/tasks/context/TaskContext.jsx";
+import { AuthProvider } from "../context/AuthContext.jsx";
+import { TaskProvider } from "../context/TaskContext.jsx";
 import ProtectedRoute from "./ProtectedRoute";
 import AuthLayout from "../layouts/AuthLayout";
 import LoginPage from "../features/auth/pages/LoginPage";

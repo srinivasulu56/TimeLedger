@@ -1,34 +1,54 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Trash2, Play, CheckCircle2, Sparkles, Terminal } from "lucide-react";
-import { useTasks } from "../context/TaskContext";
+import { useTasks } from "../../../context/TaskContext";
 import SessionTimerModal from "../components/SessionTimerModal";
 import PageTransition from "../../../shared/components/PageTransition";
 
 export default function TaskDetailsPage() {
   const { taskId } = useParams();
   const navigate = useNavigate();
-  const {
-    tasks,
-    sessions,
-    deleteTask,
-    updateSessionStatus,
-    carryForwardSession,
-  } = useTasks();
+  const context = useTasks();
+  
+  const tasks = context.tasks || [];
+  const sessions = context.sessions || [];
+  const deleteTask = context.deleteTask || context.deleteTaskPlan;
+  const updateSessionStatus = context.updateSessionStatus;
+  const carryForwardSession = context.carryForwardSession;
 
   const [activeSession, setActiveSession] = useState(null);
 
-  const task = tasks.find((t) => t.id === taskId);
+  const task = tasks.find((t) => String(t.id) === String(taskId));
+
+  // Extract task sessions from top-level sessions context OR nested inside task object
+  const taskSessions = useMemo(() => {
+    if (!task) return [];
+    
+    let list = [];
+    if (Array.isArray(sessions) && sessions.length > 0) {
+      list = sessions.filter((s) => String(s.taskId) === String(task.id) || String(s.task_id) === String(task.id));
+    }
+    
+    if (list.length === 0 && Array.isArray(task.sessions)) {
+      list = task.sessions;
+    }
+
+    return [...list].sort((a, b) => (a.order || 0) - (b.order || 0));
+  }, [task, sessions]);
 
   function handleDeleteTask() {
     if (window.confirm(`Delete "${task.title}" and all associated focus blocks?`)) {
-      deleteTask(task.id);
+      if (deleteTask) {
+        deleteTask(task.id);
+      }
       navigate("/dashboard/tasks");
     }
   }
 
   function handleCompleteFull(sessionId, status, actualMinutes, pauseLogs) {
-    updateSessionStatus(sessionId, status, actualMinutes, pauseLogs);
+    if (updateSessionStatus) {
+      updateSessionStatus(sessionId, status, actualMinutes, pauseLogs);
+    }
     setActiveSession(null);
   }
 
@@ -38,12 +58,14 @@ export default function TaskDetailsPage() {
     actualMinutesWorked,
     pauseLogs
   ) {
-    carryForwardSession(
-      session,
-      remainingMinutes,
-      actualMinutesWorked,
-      pauseLogs
-    );
+    if (carryForwardSession) {
+      carryForwardSession(
+        session,
+        remainingMinutes,
+        actualMinutesWorked,
+        pauseLogs
+      );
+    }
     setActiveSession(null);
   }
 
@@ -54,7 +76,7 @@ export default function TaskDetailsPage() {
           <h1 className="text-xl font-bold text-slate-100">// TASK_PLAN_NOT_FOUND</h1>
           <button
             onClick={() => navigate("/dashboard/tasks")}
-            className="inline-flex items-center gap-2 rounded border border-slate-800 bg-black px-4 py-2 text-xs font-bold text-cyan-400 hover:bg-slate-900 transition-all"
+            className="inline-flex items-center gap-2 rounded border border-slate-800 bg-black px-4 py-2 text-xs font-bold text-cyan-400 hover:bg-slate-900 transition-all cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4" /> RETURN_TO_PLANS
           </button>
@@ -63,10 +85,6 @@ export default function TaskDetailsPage() {
     );
   }
 
-  const taskSessions = sessions
-    .filter((s) => s.taskId === task.id)
-    .sort((a, b) => a.order - b.order);
-
   return (
     <PageTransition>
       <section className="max-w-4xl mx-auto space-y-6 font-mono">
@@ -74,7 +92,7 @@ export default function TaskDetailsPage() {
         <div>
           <button
             onClick={() => navigate("/dashboard/tasks")}
-            className="inline-flex items-center gap-2 rounded border border-slate-800 bg-[#0A0A0A] px-3 py-1.5 text-xs font-bold text-slate-400 hover:text-slate-100 hover:border-slate-700 transition-all"
+            className="inline-flex items-center gap-2 rounded border border-slate-800 bg-[#0A0A0A] px-3 py-1.5 text-xs font-bold text-slate-400 hover:text-slate-100 hover:border-slate-700 transition-all cursor-pointer"
           >
             <ArrowLeft className="w-3.5 h-3.5 text-cyan-400" />
             <span>BACK_TO_PLANS</span>
@@ -92,13 +110,13 @@ export default function TaskDetailsPage() {
                 {task.title}
               </h1>
               <p className="mt-1 text-xs text-slate-500">
-                TOTAL: {task.estimatedMinutes}m • BLOCK_SIZE: {task.sessionDuration}m
+                TOTAL: {task.estimated_minutes || task.estimatedMinutes || 0}m • BLOCK_SIZE: {task.session_duration || task.sessionDuration || 0}m
               </p>
             </div>
 
             <button
               onClick={handleDeleteTask}
-              className="flex items-center gap-1.5 rounded border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs font-bold text-red-400 hover:bg-red-500/20 transition-all"
+              className="flex items-center gap-1.5 rounded border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs font-bold text-red-400 hover:bg-red-500/20 transition-all cursor-pointer"
             >
               <Trash2 className="w-3.5 h-3.5" /> DELETE_PLAN
             </button>
@@ -112,53 +130,66 @@ export default function TaskDetailsPage() {
           </h2>
 
           <div className="space-y-2">
-            {taskSessions.map((session) => (
-              <article
-                key={session.id}
-                className={`rounded-lg border p-4 shadow-sm flex items-center justify-between transition-all ${
-                  session.isCarryover
-                    ? "bg-amber-500/5 border-amber-500/30"
-                    : session.status?.startsWith("Completed")
-                    ? "bg-[#070A0D] border-slate-900"
-                    : "bg-[#0A0A0A] border-slate-800 hover:border-slate-700"
-                }`}
-              >
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-bold text-slate-100 text-xs uppercase">
-                      BLOCK_#{session.order}
-                    </h3>
-                    {session.isCarryover && (
-                      <span className="rounded bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-400 flex items-center gap-1">
-                        <Sparkles className="w-3 h-3" /> CARRYOVER
+            {taskSessions.length === 0 ? (
+              <div className="p-6 rounded border border-dashed border-slate-800 text-center text-xs text-slate-500">
+                // NO_SESSIONS_CONFIGURED
+              </div>
+            ) : (
+              taskSessions.map((session) => {
+                const isCarryover = session.is_carryover || session.isCarryover;
+                const isCompleted = session.status?.toLowerCase().startsWith("completed");
+                const plannedDuration = session.planned_duration || session.plannedDuration || 0;
+                const actualDuration = session.actual_duration || session.actualDuration || plannedDuration;
+
+                return (
+                  <article
+                    key={session.id}
+                    className={`rounded-lg border p-4 shadow-sm flex items-center justify-between transition-all ${
+                      isCarryover
+                        ? "bg-amber-500/5 border-amber-500/30"
+                        : isCompleted
+                        ? "bg-[#070A0D] border-slate-900"
+                        : "bg-[#0A0A0A] border-slate-800 hover:border-slate-700"
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-bold text-slate-100 text-xs uppercase">
+                          BLOCK_#{session.order}
+                        </h3>
+                        {isCarryover && (
+                          <span className="rounded bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-400 flex items-center gap-1">
+                            <Sparkles className="w-3 h-3" /> CARRYOVER
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-400 mt-1 font-mono">
+                        {session.topic || "Standard Focus Session"}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-4">
+                      <span className="text-xs text-slate-500">
+                        {plannedDuration}m
                       </span>
-                    )}
-                  </div>
-                  <p className="text-xs text-slate-400 mt-1 font-mono">
-                    {session.topic || "Standard Focus Session"}
-                  </p>
-                </div>
 
-                <div className="flex items-center gap-4">
-                  <span className="text-xs text-slate-500">
-                    {session.plannedDuration}m
-                  </span>
-
-                  {session.status?.startsWith("Completed") ? (
-                    <span className="rounded border border-emerald-500/20 bg-emerald-500/5 px-3 py-1.5 text-xs font-bold text-emerald-400/80 flex items-center gap-1">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> [DONE_{session.actualDuration}m]
-                    </span>
-                  ) : (
-                    <button
-                      onClick={() => setActiveSession(session)}
-                      className="flex items-center gap-1.5 rounded border border-cyan-500/40 bg-cyan-500/10 px-3.5 py-1.5 text-xs font-bold text-cyan-400 hover:bg-cyan-500/20 hover:border-cyan-400 transition-all shadow-sm"
-                    >
-                      <Play className="w-3.5 h-3.5 fill-cyan-400" /> EXECUTE
-                    </button>
-                  )}
-                </div>
-              </article>
-            ))}
+                      {isCompleted ? (
+                        <span className="rounded border border-emerald-500/20 bg-emerald-500/5 px-3 py-1.5 text-xs font-bold text-emerald-400/80 flex items-center gap-1">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> [DONE_{actualDuration}m]
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => setActiveSession(session)}
+                          className="flex items-center gap-1.5 rounded border border-cyan-500/40 bg-cyan-500/10 px-3.5 py-1.5 text-xs font-bold text-cyan-400 hover:bg-cyan-500/20 hover:border-cyan-400 transition-all shadow-sm cursor-pointer"
+                        >
+                          <Play className="w-3.5 h-3.5 fill-cyan-400" /> EXECUTE
+                        </button>
+                      )}
+                    </div>
+                  </article>
+                );
+              })
+            )}
           </div>
         </div>
 
