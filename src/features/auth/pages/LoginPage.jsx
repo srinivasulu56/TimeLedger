@@ -70,7 +70,7 @@ export default function LoginPage() {
                 required
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}
-                placeholder="srinivas"
+                placeholder="username"
                 className="w-full rounded border border-slate-800 bg-black pl-9 pr-3 py-2.5 text-xs text-slate-100 placeholder-slate-600 outline-none focus:border-cyan-400 transition-all"
               />
             </div>
