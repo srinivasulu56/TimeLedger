@@ -9,7 +9,6 @@ import {
   LogOut,
   ChevronUp,
   User,
-  Terminal,
   Menu,
   X,
 } from "lucide-react";
@@ -62,10 +61,14 @@ export default function Sidebar() {
             <Menu className="w-4 h-4" />
           </button>
 
-          {/* App Title */}
+          {/* App Title with Custom Logo */}
           <div className="flex items-center gap-2 text-xs font-bold text-slate-200">
-            <Terminal className="w-4 h-4 text-emerald-400" />
-            <span className="tracking-widest uppercase">FOCUS_SYS</span>
+            <img
+              src="/favicon.ico"
+              alt="Time-Ledger Logo"
+              className="w-5 h-5 object-contain rounded"
+            />
+            <span className="tracking-widest uppercase">Time-Ledger</span>
             <span className="text-[10px] text-slate-500 font-normal">v2.4</span>
           </div>
         </div>
@@ -95,12 +98,14 @@ export default function Sidebar() {
               {/* Drawer Top Header */}
               <div className="space-y-6">
                 <div className="flex items-center justify-between px-2 pt-1">
-                  <div className="flex items-center gap-2">
-                    <div className="p-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
-                      <Terminal className="w-4 h-4" />
-                    </div>
+                  <div className="flex items-center gap-2.5">
+                    <img
+                      src="/favicon.ico"
+                      alt="Time-Ledger Logo"
+                      className="w-6 h-6 object-contain rounded"
+                    />
                     <span className="font-bold text-sm tracking-widest text-slate-100 uppercase">
-                      FOCUS_SYS
+                      Time-Ledger
                     </span>
                   </div>
 
