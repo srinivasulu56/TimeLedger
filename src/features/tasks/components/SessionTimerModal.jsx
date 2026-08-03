@@ -17,34 +17,35 @@ export default function SessionTimerModal({
   const [isRunning, setIsRunning] = useState(false);
   const [isReviewOpen, setIsReviewOpen] = useState(false);
 
-  // Pause tracking state
+  // Pause tracking
   const [isPauseReasonModalOpen, setIsPauseReasonModalOpen] = useState(false);
   const [pauseLogs, setPauseLogs] = useState(session.pause_logs || session.pauseLogs || []);
   const pauseStartTimeRef = useRef(null);
 
-  const timerRef = useRef(null);
-
   const secondsElapsed = totalSeconds - secondsLeft;
   const actualMinutesWorked = Math.max(1, Math.round(secondsElapsed / 60));
 
+  // 🎯 ACCURATE REAL-TIME CLOCK ENGINE (Prevents tab sleeping drift)
   useEffect(() => {
-    if (isRunning) {
-      timerRef.current = setInterval(() => {
-        setSecondsLeft((prev) => {
-          if (prev <= 1) {
-            clearInterval(timerRef.current);
-            setIsRunning(false);
-            setIsReviewOpen(true);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    } else {
-      clearInterval(timerRef.current);
-    }
+    if (!isRunning) return;
 
-    return () => clearInterval(timerRef.current);
+    const startTime = Date.now();
+    const initialSecondsLeft = secondsLeft;
+
+    const timer = setInterval(() => {
+      const elapsedSeconds = Math.floor((Date.now() - startTime) / 1000);
+      const remaining = Math.max(0, initialSecondsLeft - elapsedSeconds);
+
+      setSecondsLeft(remaining);
+
+      if (remaining === 0) {
+        clearInterval(timer);
+        setIsRunning(false);
+        setIsReviewOpen(true);
+      }
+    }, 500);
+
+    return () => clearInterval(timer);
   }, [isRunning]);
 
   const handlePauseClick = () => {
@@ -83,7 +84,6 @@ export default function SessionTimerModal({
 
   return (
     <AnimatePresence>
-      {/* Responsive Backdrop Container with auto-scroll fallback */}
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-3 sm:p-4 backdrop-blur-sm font-mono overflow-y-auto">
         <motion.div
           initial={{ opacity: 0, scale: 0.98 }}
@@ -91,20 +91,18 @@ export default function SessionTimerModal({
           exit={{ opacity: 0, scale: 0.98 }}
           className="relative w-full max-w-sm rounded-lg border border-slate-800 bg-[#0A0A0A] p-4 sm:p-6 shadow-2xl text-center flex flex-col justify-between my-auto max-h-[95vh]"
         >
-          {/* Close button */}
           <button
             onClick={onClose}
-            className="absolute right-3 top-3 sm:right-4 sm:top-4 p-1 text-slate-500 hover:text-slate-200 hover:bg-slate-800 rounded cursor-pointer"
+            className="absolute right-3 top-3 p-1 text-slate-500 hover:text-slate-200 hover:bg-slate-800 rounded cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
 
-          {/* Session Header */}
           <div>
             <span className="inline-block rounded bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-400 border border-emerald-500/20 uppercase">
               SESSION_#{session.order || 1}
             </span>
-            <h2 className="mt-1.5 sm:mt-2 text-base sm:text-lg font-bold text-slate-100 uppercase tracking-tight truncate px-4">
+            <h2 className="mt-1.5 text-base sm:text-lg font-bold text-slate-100 uppercase tracking-tight truncate px-4">
               {session.topic || `SESSION_${session.order || 1}`}
             </h2>
             <p className="text-[10px] sm:text-[11px] text-slate-500 mt-0.5">
@@ -112,7 +110,6 @@ export default function SessionTimerModal({
             </p>
           </div>
 
-          {/* Responsive Responsive Radial SVG Clock */}
           <div className="relative my-2 sm:my-4 flex items-center justify-center">
             <svg className="w-36 h-36 sm:w-44 sm:h-44 -rotate-90 transform" viewBox="0 0 200 200">
               <circle
@@ -127,7 +124,7 @@ export default function SessionTimerModal({
                 cx="100"
                 cy="100"
                 r={radius}
-                className="stroke-emerald-400 transition-all duration-1000 ease-linear"
+                className="stroke-emerald-400 transition-all duration-500 ease-linear"
                 strokeWidth="6"
                 strokeDasharray={circumference}
                 strokeDashoffset={strokeDashoffset}
@@ -146,15 +143,13 @@ export default function SessionTimerModal({
             </div>
           </div>
 
-          {/* Pause Counter Badge */}
           {pauseLogs.length > 0 && (
-            <div className="mb-2 sm:mb-3 inline-flex items-center justify-center gap-1.5 rounded bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 text-[10px] sm:text-[11px] font-bold text-amber-400">
+            <div className="mb-2 inline-flex items-center justify-center gap-1.5 rounded bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 text-[10px] font-bold text-amber-400">
               ⚠️ PAUSED_{pauseLogs.length}_TIMES
             </div>
           )}
 
-          {/* Responsive Action Controls */}
-          <div className="flex items-center justify-center gap-2 pt-1 sm:pt-2">
+          <div className="flex items-center justify-center gap-2 pt-1">
             {!isRunning ? (
               <button
                 onClick={() => setIsRunning(true)}
@@ -186,7 +181,6 @@ export default function SessionTimerModal({
           </div>
         </motion.div>
 
-        {/* Nested Modals */}
         {isPauseReasonModalOpen && (
           <PauseReasonModal
             pauseDurationMins={getPauseDurationInMinutes()}
